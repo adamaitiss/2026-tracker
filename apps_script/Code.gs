@@ -168,13 +168,19 @@ function handlePeoplePost_(payload) {
 }
 
 function getPath_(e) {
+  var path = '/';
   if (e && e.pathInfo) {
-    return e.pathInfo;
+    path = e.pathInfo;
+  } else if (e && e.parameter && e.parameter.path) {
+    path = e.parameter.path;
   }
-  if (e && e.parameter && e.parameter.path) {
-    return e.parameter.path;
+  if (!path) {
+    return '/';
   }
-  return '/';
+  if (path.charAt(0) !== '/') {
+    path = '/' + path;
+  }
+  return path;
 }
 
 function parseJson_(e) {
