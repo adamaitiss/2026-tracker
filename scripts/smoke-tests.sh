@@ -35,8 +35,16 @@ check_url "${APP_URL}sw.js" "service worker"
 check_url "${APP_URL}icon.svg" "icon"
 
 if [[ -n "${BACKEND_URL:-}" && -n "${API_TOKEN:-}" ]]; then
-  CONFIG_URL="${BACKEND_URL%/}/v1/config?token=${API_TOKEN}"
-  response=$(curl -s -H "Authorization: Bearer ${API_TOKEN}" "$CONFIG_URL")
+  if [[ "$BACKEND_URL" == *"script.google.com/macros/s/"* ]]; then
+    sep='?'
+    if [[ "$BACKEND_URL" == *"?"* ]]; then
+      sep='&'
+    fi
+    CONFIG_URL="${BACKEND_URL%/}${sep}path=/v1/config&token=${API_TOKEN}"
+  else
+    CONFIG_URL="${BACKEND_URL%/}/v1/config?token=${API_TOKEN}"
+  fi
+  response=$(curl -s -L -H "Authorization: Bearer ${API_TOKEN}" "$CONFIG_URL")
   if echo "$response" | tr -d '\r' | grep -q '"status":"ok"'; then
     echo "OK: backend /v1/config"
   else

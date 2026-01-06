@@ -956,9 +956,19 @@ function buildUrl(base, path, params) {
   }
   let url;
   try {
-    url = new URL(base.replace(/\/$/, '') + path);
+    const normalizedPath = normalizePath(path);
+    if (isAppsScriptUrl(base)) {
+      url = new URL(base);
+      url.searchParams.set('path', normalizedPath);
+    } else {
+      url = new URL(base.replace(/\/$/, '') + normalizedPath);
+    }
   } catch (err) {
-    return base.replace(/\/$/, '') + path;
+    if (isAppsScriptUrl(base)) {
+      const sep = base.includes('?') ? '&' : '?';
+      return `${base}${sep}path=${encodeURIComponent(normalizePath(path))}`;
+    }
+    return base.replace(/\/$/, '') + normalizePath(path);
   }
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -968,6 +978,17 @@ function buildUrl(base, path, params) {
     });
   }
   return url.toString();
+}
+
+function normalizePath(path) {
+  if (!path) {
+    return '/';
+  }
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
+function isAppsScriptUrl(base) {
+  return String(base).includes('script.google.com/macros/s/');
 }
 
 function showToast(message, subtle = false) {
