@@ -1,0 +1,15 @@
+{
+  "name": "2026 Tracker",
+  "short_name": "2026 Tracker",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f6f1e6",
+  "theme_color": "#1f3f32",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

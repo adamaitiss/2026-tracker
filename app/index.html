@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1f3f32" />
+  <title>2026 Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient"></div>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">2026</div>
+        <div class="brand-copy">
+          <div class="brand-title">Tracker</div>
+          <div class="brand-sub">Plan-aligned logging</div>
+        </div>
+      </div>
+      <div class="status-panel">
+        <div class="status-chip" id="connectionStatus">Offline</div>
+        <div class="status-chip" id="queueStatus">Queue: 0</div>
+        <button class="ghost" id="retryQueue">Retry queue</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-view="logView">Log</button>
+      <button class="tab" data-view="weeklyView">Weekly</button>
+      <button class="tab" data-view="settingsView">Settings</button>
+      <a class="tab link" id="dashboardLink" href="#" target="_blank" rel="noopener">Dashboards</a>
+    </nav>
+
+    <main>
+      <section id="logView" class="view active">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Quick Log</div>
+            <div class="section-sub">Tap a tile to capture an event in seconds.</div>
+          </div>
+          <button class="ghost" id="refreshConfig">Refresh config</button>
+        </div>
+        <div id="tiles" class="tiles"></div>
+      </section>
+
+      <section id="weeklyView" class="view">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Weekly Review</div>
+            <div class="section-sub">Fill once per week. Updates Raw_Weekly.</div>
+          </div>
+        </div>
+        <form id="weeklyForm" class="card form">
+          <div class="form-row">
+            <label>Week start (Monday)
+              <input type="date" id="weekStart" required />
+            </label>
+            <label>Work hours
+              <input type="number" id="workHours" step="0.25" min="0" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>Expenses (RUB)
+              <input type="number" id="expensesPersonal" step="1" min="0" />
+            </label>
+            <label>Excluded renovation (RUB)
+              <input type="number" id="excludedRenovation" step="1" min="0" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>Net worth (RUB)
+              <input type="number" id="netWorth" step="1" min="0" />
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="dealSpike" />
+              Deal spike week
+            </label>
+          </div>
+          <label>Notes
+            <textarea id="weeklyNotes" rows="3" placeholder="Weekly notes"></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary">Submit weekly review</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="settingsView" class="view">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Settings</div>
+            <div class="section-sub">Connect to your Google Apps Script backend.</div>
+          </div>
+        </div>
+        <div class="card form">
+          <label>Backend URL
+            <input type="url" id="backendUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+          </label>
+          <label>API token
+            <input type="password" id="apiToken" placeholder="Set in Script Properties" />
+          </label>
+          <label>Dashboard URL (optional)
+            <input type="url" id="dashboardUrl" placeholder="Google Sheet or dashboard link" />
+          </label>
+          <div class="form-actions">
+            <button class="primary" id="saveSettings" type="button">Save settings</button>
+            <button class="ghost" id="testConnection" type="button">Test connection</button>
+          </div>
+          <div class="status-note" id="settingsStatus"></div>
+        </div>
+
+        <div class="card form">
+          <div class="section-title">Favorites</div>
+          <div class="section-sub">Pinned people appear first in person pickers.</div>
+          <div id="favoritesList" class="favorites-list"></div>
+        </div>
+
+        <div class="card form">
+          <div class="section-title">Config snapshot</div>
+          <div class="section-sub" id="configStatus">No config loaded.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="tileModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="modalTitle"></div>
+          <div class="modal-sub" id="modalSub"></div>
+        </div>
+        <button class="ghost" id="modalClose" type="button">Close</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions">
+        <button class="primary" id="modalSubmit" type="button">Log event</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
