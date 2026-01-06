@@ -603,11 +603,16 @@ async function handleWeeklySubmit(event) {
   }
 }
 
-async function saveSettings() {
-  const backendUrl = document.getElementById('backendUrl').value.trim();
-  const apiToken = document.getElementById('apiToken').value.trim();
-  const dashboardUrl = document.getElementById('dashboardUrl').value.trim();
+function readSettingsForm() {
+  return {
+    backendUrl: document.getElementById('backendUrl').value.trim(),
+    apiToken: document.getElementById('apiToken').value.trim(),
+    dashboardUrl: document.getElementById('dashboardUrl').value.trim()
+  };
+}
 
+async function saveSettings() {
+  const { backendUrl, apiToken, dashboardUrl } = readSettingsForm();
   state.settings = { backendUrl, apiToken, dashboardUrl };
   localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings));
   updateDashboardLink();
@@ -619,22 +624,41 @@ async function saveSettings() {
 }
 
 async function testConnection() {
+  const { backendUrl, apiToken } = readSettingsForm();
+  if (!backendUrl || !apiToken) {
+    showSettingsStatus('Missing backend URL or API token');
+    return;
+  }
   try {
-    const url = buildUrl(state.settings.backendUrl, '/v1/config', {
-      token: state.settings.apiToken
+    const url = buildUrl(backendUrl, '/v1/config', {
+      token: apiToken
     });
-    const headers = isAppsScriptUrl(state.settings.backendUrl)
+    const headers = isAppsScriptUrl(backendUrl)
       ? {}
-      : { Authorization: `Bearer ${state.settings.apiToken}` };
+      : { Authorization: `Bearer ${apiToken}` };
     const response = await fetch(url, {
-      headers
+      headers,
+      cache: 'no-store'
     });
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (err) {
+      data = null;
+    }
     if (!response.ok) {
-      throw new Error('Connection failed');
+      showSettingsStatus(`Connection failed (HTTP ${response.status})`);
+      return;
+    }
+    if (!data || data.status !== 'ok') {
+      const detail = data?.message || data?.code || 'Invalid response';
+      showSettingsStatus(`Connection failed: ${detail}`);
+      return;
     }
     showSettingsStatus('Connected');
   } catch (err) {
-    showSettingsStatus('Connection failed');
+    const detail = err && err.message ? `: ${err.message}` : '';
+    showSettingsStatus(`Connection failed${detail}`);
   }
 }
 
