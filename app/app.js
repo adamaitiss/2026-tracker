@@ -123,10 +123,11 @@ async function loadConfig({ force = false } = {}) {
     const url = buildUrl(state.settings.backendUrl, '/v1/config', {
       token: state.settings.apiToken
     });
+    const headers = isAppsScriptUrl(state.settings.backendUrl)
+      ? {}
+      : { Authorization: `Bearer ${state.settings.apiToken}` };
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${state.settings.apiToken}`
-      }
+      headers
     });
     if (!response.ok) {
       throw new Error('Config fetch failed');
@@ -622,10 +623,11 @@ async function testConnection() {
     const url = buildUrl(state.settings.backendUrl, '/v1/config', {
       token: state.settings.apiToken
     });
+    const headers = isAppsScriptUrl(state.settings.backendUrl)
+      ? {}
+      : { Authorization: `Bearer ${state.settings.apiToken}` };
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${state.settings.apiToken}`
-      }
+      headers
     });
     if (!response.ok) {
       throw new Error('Connection failed');
@@ -673,12 +675,16 @@ async function postJson(path, payload) {
     ...payload,
     auth_token: state.settings.apiToken
   };
+  const isAppsScript = isAppsScriptUrl(state.settings.backendUrl);
+  const headers = isAppsScript
+    ? { 'Content-Type': 'text/plain;charset=utf-8' }
+    : {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${state.settings.apiToken}`
+      };
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${state.settings.apiToken}`
-    },
+    headers,
     body: JSON.stringify(body)
   });
   if (!response.ok) {
