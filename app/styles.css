@@ -166,6 +166,30 @@ body {
 }
 
 .tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.tile-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.tile-group-title {
+  font-family: "Fraunces", serif;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.tile-group-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;

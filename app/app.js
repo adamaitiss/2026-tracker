@@ -166,27 +166,77 @@ function renderTiles() {
     return;
   }
 
-  tiles.forEach((tile, index) => {
-    const card = document.createElement('div');
-    card.className = 'tile';
-    card.style.animationDelay = `${index * 40}ms`;
-    card.addEventListener('click', () => openTileModal(tile));
+  const metrics = state.config?.metric_catalog || [];
+  const metricByCode = new Map(metrics.map((metric) => [metric.MetricCode, metric]));
+  const groups = new Map();
+  const groupOrder = [];
+
+  tiles.forEach((tile) => {
+    const metric = metricByCode.get(tile.MetricCode) || {};
+    const category = String(metric.Category || 'Other').trim() || 'Other';
+    if (category.toLowerCase() === 'dating') {
+      return;
+    }
+    const key = category.toLowerCase();
+    if (!groups.has(key)) {
+      groups.set(key, { label: category, tiles: [] });
+      groupOrder.push(key);
+    }
+    groups.get(key).tiles.push({ tile, metric });
+  });
+
+  if (!groupOrder.length) {
+    container.innerHTML = '<div class="card">No tiles available for current categories.</div>';
+    return;
+  }
+
+  groupOrder.forEach((key) => {
+    const group = groups.get(key);
+    const section = document.createElement('section');
+    section.className = 'tile-group';
+
+    const header = document.createElement('div');
+    header.className = 'tile-group-header';
 
     const title = document.createElement('div');
-    title.className = 'tile-title';
-    title.textContent = tile.DisplayName || tile.TileID;
+    title.className = 'tile-group-title';
+    title.textContent = group.label;
 
     const meta = document.createElement('div');
-    meta.className = 'tile-meta';
-    meta.textContent = `${tile.MetricCode} · ${tile.WidgetType}`;
+    meta.className = 'tile-group-meta';
+    meta.textContent = `${group.tiles.length} tile${group.tiles.length === 1 ? '' : 's'}`;
 
-    const tag = document.createElement('div');
-    tag.className = 'tile-tag';
-    const tagValue = toNumber(tile.DefaultValue, 1);
-    tag.textContent = tile.Unit ? `${tagValue} ${tile.Unit}` : 'Tap to log';
+    header.append(title, meta);
+    section.appendChild(header);
 
-    card.append(title, meta, tag);
-    container.appendChild(card);
+    const grid = document.createElement('div');
+    grid.className = 'tile-grid';
+
+    group.tiles.forEach((entry, index) => {
+      const card = document.createElement('div');
+      card.className = 'tile';
+      card.style.animationDelay = `${index * 40}ms`;
+      card.addEventListener('click', () => openTileModal(entry.tile));
+
+      const tileTitle = document.createElement('div');
+      tileTitle.className = 'tile-title';
+      tileTitle.textContent = entry.tile.DisplayName || entry.tile.TileID;
+
+      const tileMeta = document.createElement('div');
+      tileMeta.className = 'tile-meta';
+      tileMeta.textContent = `${entry.tile.MetricCode} · ${entry.tile.WidgetType}`;
+
+      const tag = document.createElement('div');
+      tag.className = 'tile-tag';
+      const tagValue = toNumber(entry.tile.DefaultValue, 1);
+      tag.textContent = entry.tile.Unit ? `${tagValue} ${entry.tile.Unit}` : 'Tap to log';
+
+      card.append(tileTitle, tileMeta, tag);
+      grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+    container.appendChild(section);
   });
 }
 
