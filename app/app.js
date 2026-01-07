@@ -32,7 +32,12 @@ const EXCLUDED_TILE_IDS = new Set([
   'T_VP_PITCH',
   'T_INIT_IDEA',
   'T_ACTIVITY_CANCEL',
-  'T_INVEST_COVER'
+  'T_INVEST_COVER',
+  'T_TRAVEL',
+  'T_NEW_ACT',
+  'T_TRAIN',
+  'T_REL_CONTACT',
+  'T_BOOK'
 ]);
 
 const EXCLUDED_METRIC_CODES = new Set([
@@ -46,7 +51,35 @@ const EXCLUDED_METRIC_CODES = new Set([
   'INITIATIVE_PRESENTED_VP',
   'INITIATIVE_IDEA',
   'ACTIVITY_CANCELLED',
-  'INVESTMENT_COVERAGE'
+  'INVESTMENT_COVERAGE',
+  'TRAVEL_NIGHT',
+  'NEW_ACTIVITY',
+  'TRAINING_MIN',
+  'RELEVANT_CONTACT_APPROACH',
+  'BOOK_FINISHED'
+]);
+
+const DAILY_TILE_IDS = new Set([
+  'T_IDEA',
+  'T_POSTURE',
+  'T_MINDFUL',
+  'T_ORIG',
+  'T_DEEP_WORK',
+  'T_DICT'
+]);
+
+const DAILY_METRIC_CODES = new Set([
+  'IDEA',
+  'POSTURE_SESSION',
+  'MINDFULNESS_MIN',
+  'ORIGINATION_ACTION',
+  'DEEP_WORK_HOURS',
+  'DICTION_TRAINING_MIN'
+]);
+
+const HOBBY_METRIC_CODES = new Set([
+  'COOKING_SESSION',
+  'PISTOL_SHOOTING_SESSION'
 ]);
 
 const state = {
@@ -207,10 +240,26 @@ function renderTiles() {
     if (EXCLUDED_TILE_IDS.has(tileId) || EXCLUDED_METRIC_CODES.has(metricCode)) {
       return;
     }
+    if (DAILY_TILE_IDS.has(tileId) || DAILY_METRIC_CODES.has(metricCode)) {
+      const dailyKey = 'daily';
+      if (!groups.has(dailyKey)) {
+        groups.set(dailyKey, { label: 'Daily', tiles: [] });
+        groupOrder.push(dailyKey);
+      }
+      const metric = metricByCode.get(tile.MetricCode) || {};
+      groups.get(dailyKey).tiles.push({ tile, metric });
+      return;
+    }
     const metric = metricByCode.get(tile.MetricCode) || {};
-    const category = String(metric.Category || 'Other').trim() || 'Other';
+    let category = String(metric.Category || 'Other').trim() || 'Other';
     if (category.toLowerCase() === 'dating') {
       return;
+    }
+    if (HOBBY_METRIC_CODES.has(metricCode)) {
+      category = 'Hobbies';
+    }
+    if (category.toLowerCase() === 'adventure') {
+      category = 'Hobbies';
     }
     const key = category.toLowerCase();
     if (!groups.has(key)) {
@@ -225,7 +274,12 @@ function renderTiles() {
     return;
   }
 
-  groupOrder.forEach((key) => {
+  const orderedKeys = groupOrder.filter((key) => key !== 'daily');
+  if (groupOrder.includes('daily')) {
+    orderedKeys.unshift('daily');
+  }
+
+  orderedKeys.forEach((key) => {
     const group = groups.get(key);
     const section = document.createElement('section');
     section.className = 'tile-group';
