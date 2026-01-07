@@ -18,6 +18,37 @@ const PERSON_TYPE_BY_METRIC = {
   PARTNER_QUALITY_TIME: 'Romance'
 };
 
+const MOSCOW_TZ = 'Europe/Moscow';
+const MOSCOW_OFFSET_MINUTES = 180;
+
+const EXCLUDED_TILE_IDS = new Set([
+  'T_IDEA_STAR',
+  'T_SLEEP',
+  'T_WORKOUT_SKIP',
+  'T_EXERCISE_RESULT',
+  'T_VOICE',
+  'T_STAKE_CHAT',
+  'T_MEMO',
+  'T_VP_PITCH',
+  'T_INIT_IDEA',
+  'T_ACTIVITY_CANCEL',
+  'T_INVEST_COVER'
+]);
+
+const EXCLUDED_METRIC_CODES = new Set([
+  'IDEA_STAR',
+  'SLEEP_HOURS',
+  'WORKOUT_SKIPPED',
+  'EXERCISE_RESULT_KG',
+  'VOICE_SAMPLE',
+  'STAKEHOLDER_CHAT',
+  'MEMO_WRITTEN',
+  'INITIATIVE_PRESENTED_VP',
+  'INITIATIVE_IDEA',
+  'ACTIVITY_CANCELLED',
+  'INVESTMENT_COVERAGE'
+]);
+
 const state = {
   config: null,
   settings: loadSettings(),
@@ -98,12 +129,11 @@ function setView(viewId) {
 
 function setDefaultWeekStart() {
   const input = document.getElementById('weekStart');
-  const now = new Date();
-  const monday = new Date(now);
-  const diff = (monday.getDay() + 6) % 7;
-  monday.setDate(monday.getDate() - diff);
-  monday.setHours(0, 0, 0, 0);
-  input.value = formatDateInput(monday);
+  const parts = getMoscowParts(new Date());
+  const base = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  const diff = (base.getUTCDay() + 6) % 7;
+  base.setUTCDate(base.getUTCDate() - diff);
+  input.value = formatDateInput(base);
 }
 
 async function loadConfig({ force = false } = {}) {
@@ -172,6 +202,11 @@ function renderTiles() {
   const groupOrder = [];
 
   tiles.forEach((tile) => {
+    const tileId = String(tile.TileID || '').toUpperCase();
+    const metricCode = String(tile.MetricCode || '').toUpperCase();
+    if (EXCLUDED_TILE_IDS.has(tileId) || EXCLUDED_METRIC_CODES.has(metricCode)) {
+      return;
+    }
     const metric = metricByCode.get(tile.MetricCode) || {};
     const category = String(metric.Category || 'Other').trim() || 'Other';
     if (category.toLowerCase() === 'dating') {
@@ -437,7 +472,9 @@ function renderPersonSelect(people) {
   });
 
   const firstMetInput = document.createElement('input');
-  firstMetInput.type = 'date';
+  firstMetInput.type = 'text';
+  firstMetInput.placeholder = 'dd/mm/yyyy';
+  firstMetInput.inputMode = 'numeric';
 
   const addButton = document.createElement('button');
   addButton.type = 'button';
@@ -450,11 +487,20 @@ function renderPersonSelect(people) {
       showToast('Add a name first', true);
       return;
     }
+    let firstMet = null;
+    if (firstMetInput.value.trim()) {
+      const parsed = parseDateInput(firstMetInput.value.trim());
+      if (!parsed) {
+        showToast('Use dd/mm/yyyy for First met', true);
+        return;
+      }
+      firstMet = toIsoWithOffset(parsed);
+    }
     const payload = {
       person_id: generatePersonId(),
       name,
       type: typeSelect.value,
-      first_met: firstMetInput.value || null
+      first_met: firstMet
     };
     try {
       const result = await postJson('/v1/people', payload);
@@ -531,7 +577,9 @@ function renderBackdateControls() {
   toggleRow.append(checkbox, text);
 
   const input = document.createElement('input');
-  input.type = 'datetime-local';
+  input.type = 'text';
+  input.placeholder = 'dd/mm/yyyy HH:MM';
+  input.inputMode = 'numeric';
   input.value = formatDateTimeLocal(new Date());
   input.style.display = 'none';
 
@@ -592,9 +640,17 @@ async function submitModalEvent() {
     }
   }
 
-  const occurredAt = modalState.backdateToggle?.checked
-    ? toIsoWithOffset(new Date(modalState.backdateInput.value))
-    : toIsoWithOffset(new Date());
+  let occurredDate = new Date();
+  if (modalState.backdateToggle?.checked) {
+    const raw = modalState.backdateInput?.value ? modalState.backdateInput.value.trim() : '';
+    const parsed = parseDateTimeInput(raw);
+    if (!parsed) {
+      showToast('Use dd/mm/yyyy HH:MM for backdate', true);
+      return;
+    }
+    occurredDate = parsed;
+  }
+  const occurredAt = toIsoWithOffset(occurredDate);
 
   const payload = {
     event_id: generateEventId(),
@@ -631,8 +687,15 @@ async function submitEvent(payload) {
 async function handleWeeklySubmit(event) {
   event.preventDefault();
 
+  const weekStartRaw = document.getElementById('weekStart').value.trim();
+  const weekStartDate = parseDateInput(weekStartRaw);
+  if (!weekStartDate) {
+    showToast('Use dd/mm/yyyy for week start', true);
+    return;
+  }
+
   const payload = {
-    week_start: document.getElementById('weekStart').value,
+    week_start: toIsoWithOffset(weekStartDate),
     work_hours: inputValue('workHours'),
     expenses_personal_rub: inputValue('expensesPersonal'),
     excluded_renovation_rub: inputValue('excludedRenovation'),
@@ -735,7 +798,7 @@ function updateConfigStatus() {
   }
   const tileCount = getActiveTiles().length;
   const peopleCount = (state.config.people || []).length;
-  status.textContent = `Tiles: ${tileCount}. People: ${peopleCount}. Last sync: ${new Date().toLocaleString()}`;
+  status.textContent = `Tiles: ${tileCount}. People: ${peopleCount}. Last sync: ${formatDateTimeLocal(new Date())}`;
 }
 
 async function postJson(path, payload) {
@@ -974,38 +1037,106 @@ function needsTemplate(tile, metric) {
   return isTruthy(tile?.['NeedsTemplate?']) || isTruthy(metric?.['NeedsTemplate?']) || tile?.WidgetType === 'template_stepper';
 }
 
-function formatDateInput(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function getMoscowParts(date) {
+  const safeDate = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: MOSCOW_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(safeDate);
+  const map = {};
+  parts.forEach((part) => {
+    if (part.type !== 'literal') {
+      map[part.type] = part.value;
+    }
+  });
+  return {
+    year: map.year,
+    month: map.month,
+    day: map.day,
+    hour: map.hour,
+    minute: map.minute,
+    second: map.second
+  };
 }
 
-function formatDateTimeLocal(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hour}:${minute}`;
-}
-
-function toIsoWithOffset(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    date = new Date();
-  }
-  const offset = -date.getTimezoneOffset();
+function formatMoscowOffset() {
+  const offset = MOSCOW_OFFSET_MINUTES;
   const sign = offset >= 0 ? '+' : '-';
   const absOffset = Math.abs(offset);
   const offsetHours = String(Math.floor(absOffset / 60)).padStart(2, '0');
   const offsetMinutes = String(absOffset % 60).padStart(2, '0');
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${sign}${offsetHours}:${offsetMinutes}`;
+  return `${sign}${offsetHours}:${offsetMinutes}`;
+}
+
+function formatDateInput(date) {
+  const parts = getMoscowParts(date);
+  return `${parts.day}/${parts.month}/${parts.year}`;
+}
+
+function formatDateTimeLocal(date) {
+  const parts = getMoscowParts(date);
+  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
+}
+
+function parseDateInput(value) {
+  const match = String(value || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) {
+    return null;
+  }
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  if (!isValidDateParts(year, month, day)) {
+    return null;
+  }
+  const utcMs = Date.UTC(year, month - 1, day, 0, 0, 0) - MOSCOW_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMs);
+}
+
+function parseDateTimeInput(value) {
+  const match = String(value || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (!isValidDateParts(year, month, day)) {
+    return null;
+  }
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute, 0) - MOSCOW_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMs);
+}
+
+function isValidDateParts(year, month, day) {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return false;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return false;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
+}
+
+function toIsoWithOffset(date) {
+  const parts = getMoscowParts(date);
+  const offset = formatMoscowOffset();
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;
 }
 
 function generateEventId() {
